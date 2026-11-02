@@ -1,4 +1,4 @@
-/* Combi Analyzer V4: busca DFS com poda de ramos impossíveis. */
+/* Combi Analyzer V6: busca DFS com poda de ramos impossíveis. */
 let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[];
 const CHUNK_NODES=50000, SEND_BATCH=500;
 self.onmessage=({data})=>{
@@ -28,7 +28,7 @@ function* search(){
     nodes++;if(nodes%10000===0)yield {tick:true};
     const depth=selected.length, need=pick-depth, remain=nums.length-start;
     if(need<0||remain<need)return;
-    if(f.parity&&(even>f.even||even+possibleCount(nums,start,need,n=>n%2===0)<f.even))return;
+    if(f.parity){const odd=depth-even,evensPossible=possibleCount(nums,start,need,n=>n%2===0),oddsPossible=possibleCount(nums,start,need,n=>n%2!==0);if(even>f.evenMax||odd>f.oddMax||even+evensPossible<f.evenMin||odd+oddsPossible<f.oddMin)return;}
     if(f.prime&&(primes>f.primes||primes+possibleCount(nums,start,need,n=>isPrime[n])<f.primes))return;
     if(f.low&&(low>f.lowCount||low+possibleCount(nums,start,need,n=>n<=half)<f.lowCount))return;
     if(f.fib&&(fibCount>f.fibCount||fibCount+possibleCount(nums,start,need,n=>fib[n])<f.fibCount))return;
@@ -39,6 +39,7 @@ function* search(){
     if(f.consecutive&&consecutive>f.maxConsecutive)return;
     if(f.decades){let occupied=decadeCounts.size;if(occupied+Math.min(need,Math.max(0,Math.ceil((max-(selected.length?selected[depth-1]:min-1))/10)))<f.minDecades)return;}
     if(need===0){
+      if(f.parity&&(even<f.evenMin||even>f.evenMax||(pick-even)<f.oddMin||(pick-even)>f.oddMax))return;
       if(f.sum&&((f.sumMin!==null&&sum<f.sumMin)||(f.sumMax!==null&&sum>f.sumMax)))return;
       if(f.width&&((f.widthMin!==null&&selected[pick-1]-selected[0]<f.widthMin)||(f.widthMax!==null&&selected[pick-1]-selected[0]>f.widthMax)))return;
       if(f.decades&&decadeCounts.size<f.minDecades)return;
@@ -54,7 +55,7 @@ function* search(){
       const n=nums[i], prev=depth?selected[depth-1]:null;
       if(f.lists&&required.some(r=>!selected.includes(r))){let possible=true;for(const r of required)if(!selected.includes(r)&&r<n){possible=false;break;}if(!possible)continue;}
       const e=even+(n%2===0?1:0),p=primes+(isPrime[n]?1:0),s=sum+n;
-      if(f.parity&&e>f.even)continue;if(f.prime&&p>f.primes)continue;if(f.sum&&f.sumMax!==null&&s>f.sumMax)continue;
+      if(f.parity&&(e>f.evenMax||((selected.length+1)-e)>f.oddMax))continue;if(f.prime&&p>f.primes)continue;if(f.sum&&f.sumMax!==null&&s>f.sumMax)continue;
       const con=consecutive+(prev!==null&&n===prev+1?1:0);if(f.consecutive&&con>f.maxConsecutive)continue;
       const lo=low+(n<=half?1:0);if(f.low&&lo>f.lowCount)continue;
       const fc=fibCount+(fib[n]?1:0);if(f.fib&&fc>f.fibCount)continue;
