@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const DB_NAME='CombiAnalyzerV4DB',STORE='batches';
+const DB_NAME='CombiAnalyzerV5DB',STORE='batches';
 const state={worker:null,db:null,running:false,paused:false,processed:0,found:0,preview:[],groupSize:10000,saving:Promise.resolve()};
 const fmt=n=>Number(n).toLocaleString('pt-BR');
 function chooseBig(n,r){if(r<0||r>n)return 0n;r=Math.min(r,n-r);let x=1n;for(let i=1;i<=r;i++)x=x*BigInt(n-r+i)/BigInt(i);return x;}
@@ -13,7 +13,7 @@ function readConfig(){
  const on=id=>$(id).checked, num=id=>$(id).value===''?null:+$(id).value;
  const include=parseList('includeNumbers'),exclude=parseList('excludeNumbers'),previous=parseList('previousNumbers');
  const f={
-  parity:on('parityEnabled'),even:num('evenCount'),prime:on('primeEnabled'),primes:num('primeCount'),
+  parity:on('parityEnabled'),evenMin:num('evenMin')??0,evenMax:num('evenMax')??pick,oddMin:num('oddMin')??0,oddMax:num('oddMax')??pick,prime:on('primeEnabled'),primes:num('primeCount'),
   sum:on('sumEnabled'),sumMin:num('sumMin'),sumMax:num('sumMax'),
   consecutive:on('consecutiveEnabled'),maxConsecutive:num('maxConsecutive')??0,
   low:on('lowEnabled'),lowCount:num('lowCount'),
@@ -23,7 +23,7 @@ function readConfig(){
   fib:on('fibEnabled'),fibCount:num('fibCount'),multiple:on('multipleEnabled'),multipleOf:num('multipleOf')??2,multipleCount:num('multipleCount'),
   lists:on('listsEnabled'),include,exclude,previous:on('previousEnabled'),previousNumbers:previous,repeatMin:num('repeatMin')??0,repeatMax:num('repeatMax')??pick
  };
- if(f.parity&&(!Number.isInteger(f.even)||f.even<0||f.even>pick))throw Error('Quantidade de pares inválida.');
+ if(f.parity&&(![f.evenMin,f.evenMax,f.oddMin,f.oddMax].every(Number.isInteger)||f.evenMin<0||f.evenMax>pick||f.evenMin>f.evenMax||f.oddMin<0||f.oddMax>pick||f.oddMin>f.oddMax||f.evenMin+f.oddMin>pick||f.evenMax+f.oddMax<pick))throw Error('Confira os limites de pares e ímpares. Os intervalos precisam permitir completar a quantidade de números da combinação.');
  if(f.prime&&(!Number.isInteger(f.primes)||f.primes<0||f.primes>pick))throw Error('Quantidade de primos inválida.');
  if(f.sum&&f.sumMin!==null&&f.sumMax!==null&&f.sumMin>f.sumMax)throw Error('Soma mínima maior que a máxima.');
  if(f.low&&(!Number.isInteger(f.lowCount)||f.lowCount<0||f.lowCount>pick))throw Error('Quantidade de baixos inválida.');
@@ -54,6 +54,6 @@ async function generate(){let c;try{c=readConfig();state.db||=await openDB();}ca
  state.worker.postMessage({type:'start',config:c});
 }
 function readPage(after=0,count=20){return new Promise((resolve,reject)=>{const tx=state.db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).openCursor(after?IDBKeyRange.lowerBound(after,true):null),out=[];req.onsuccess=()=>{const cur=req.result;if(!cur||out.length>=count){resolve(out);return;}out.push({id:cur.key,results:cur.value.results});cur.continue();};req.onerror=()=>reject(req.error);});}
-async function exportCSV(){if(!state.db||!state.found)return;let writable=null,parts=[],last=0,row=0;const head='Grupo;Combinacao;Soma;Pares;Impares;Primos\n';try{if(window.showSaveFilePicker){const h=await showSaveFilePicker({suggestedName:'combi-analyzer-v4.csv',types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});writable=await h.createWritable();await writable.write('\uFEFF'+head);}else parts.push('\uFEFF'+head);while(true){const page=await readPage(last,25);if(!page.length)break;let chunk='';for(const b of page){last=b.id;for(const x of b.results){chunk+=`${Math.floor(row/state.groupSize)+1};"${x.combo.join('-')}";${x.sum};${x.even};${x.combo.length-x.even};${x.primes}\n`;row++;}}if(writable)await writable.write(chunk);else parts.push(chunk);}if(writable)await writable.close();else{const a=document.createElement('a'),url=URL.createObjectURL(new Blob(parts,{type:'text/csv;charset=utf-8'}));a.href=url;a.download='combi-analyzer-v4.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}alert(`Exportação concluída: ${fmt(row)} combinações.`);}catch(e){if(writable)try{await writable.abort();}catch{}if(e.name!=='AbortError')alert('Falha na exportação: '+e.message);}}
+async function exportCSV(){if(!state.db||!state.found)return;let writable=null,parts=[],last=0,row=0;const head='Grupo;Combinacao;Soma;Pares;Impares;Primos\n';try{if(window.showSaveFilePicker){const h=await showSaveFilePicker({suggestedName:'combi-analyzer-v6.csv',types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});writable=await h.createWritable();await writable.write('\uFEFF'+head);}else parts.push('\uFEFF'+head);while(true){const page=await readPage(last,25);if(!page.length)break;let chunk='';for(const b of page){last=b.id;for(const x of b.results){chunk+=`${Math.floor(row/state.groupSize)+1};"${x.combo.join('-')}";${x.sum};${x.even};${x.combo.length-x.even};${x.primes}\n`;row++;}}if(writable)await writable.write(chunk);else parts.push(chunk);}if(writable)await writable.close();else{const a=document.createElement('a'),url=URL.createObjectURL(new Blob(parts,{type:'text/csv;charset=utf-8'}));a.href=url;a.download='combi-analyzer-v6.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}alert(`Exportação concluída: ${fmt(row)} combinações.`);}catch(e){if(writable)try{await writable.abort();}catch{}if(e.name!=='AbortError')alert('Falha na exportação: '+e.message);}}
 $('generateBtn').addEventListener('click',generate);$('pauseBtn').addEventListener('click',()=>{if(!state.worker)return;state.paused=!state.paused;state.worker.postMessage({type:state.paused?'pause':'resume'});$('pauseBtn').textContent=state.paused?'▶ Continuar':'Ⅱ Pausar';setStatus(state.paused?'paused':'running');});$('stopBtn').addEventListener('click',()=>state.worker?.postMessage({type:'stop'}));$('exportBtn').addEventListener('click',exportCSV);
 $('clearFilters').addEventListener('click',()=>{document.querySelectorAll('.filter-card .switch input').forEach(x=>x.checked=false);});
