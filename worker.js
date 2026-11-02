@@ -1,4 +1,4 @@
-/* Combi Analyzer V6: busca DFS com poda de ramos impossíveis. */
+/* Combi Analyzer V7: busca DFS com poda de ramos impossíveis. */
 let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[];
 const CHUNK_NODES=50000, SEND_BATCH=500;
 self.onmessage=({data})=>{
@@ -17,9 +17,12 @@ function runChunk(){if(paused)return;if(stopped){finish('stopped');return;}let n
 }
 function* search(){
   const {min,max,pick,filters:f}=cfg, nums=[];
-  const excluded=new Set(f.lists?f.exclude:[]);for(let n=min;n<=max;n++)if(!excluded.has(n))nums.push(n);
-  const required=f.lists?f.include:[];
-  if(required.some(n=>n<min||n>max||excluded.has(n))||new Set(required).size!==required.length||required.length>pick){return;}
+  const excluded=new Set(f.lists?f.exclude:[]);
+  const source=Array.from({length:max-min+1},(_,i)=>min+i);
+  for(const n of source)if(n>=min&&n<=max&&!excluded.has(n))nums.push(n);
+  if(nums.length<pick)return;
+  const required=[...new Set([...(f.lists?f.include:[]),...(cfg.fixedNumbers||[])])].sort((a,b)=>a-b);
+  if(required.some(n=>n<min||n>max||excluded.has(n))||required.length>pick){return;}
   const isPrime=sieve(max), fib=fibonacci(max), half=min+Math.floor((max-min)/2);
   f.previousSet=new Set(f.previousNumbers||[]);
   const selected=[], decadeCounts=new Map(), endingCounts=new Uint8Array(10);
@@ -29,10 +32,10 @@ function* search(){
     const depth=selected.length, need=pick-depth, remain=nums.length-start;
     if(need<0||remain<need)return;
     if(f.parity){const odd=depth-even,evensPossible=possibleCount(nums,start,need,n=>n%2===0),oddsPossible=possibleCount(nums,start,need,n=>n%2!==0);if(even>f.evenMax||odd>f.oddMax||even+evensPossible<f.evenMin||odd+oddsPossible<f.oddMin)return;}
-    if(f.prime&&(primes>f.primes||primes+possibleCount(nums,start,need,n=>isPrime[n])<f.primes))return;
-    if(f.low&&(low>f.lowCount||low+possibleCount(nums,start,need,n=>n<=half)<f.lowCount))return;
-    if(f.fib&&(fibCount>f.fibCount||fibCount+possibleCount(nums,start,need,n=>fib[n])<f.fibCount))return;
-    if(f.multiple&&(multipleCount>f.multipleCount||multipleCount+possibleCount(nums,start,need,n=>n%f.multipleOf===0)<f.multipleCount))return;
+    if(f.prime&&(primes>f.primeMax||primes+possibleCount(nums,start,need,n=>isPrime[n])<f.primeMin))return;
+    if(f.low&&(low>f.lowMax||low+possibleCount(nums,start,need,n=>n<=half)<f.lowMin))return;
+    if(f.fib&&(fibCount>f.fibMax||fibCount+possibleCount(nums,start,need,n=>fib[n])<f.fibMin))return;
+    if(f.multiple&&(multipleCount>f.multipleMax||multipleCount+possibleCount(nums,start,need,n=>n%f.multipleOf===0)<f.multipleMin))return;
     if(f.previous&&(repeatCount>f.repeatMax||repeatCount+possibleCount(nums,start,need,n=>f.previousSet.has(n))<f.repeatMin))return;
     if(f.sum){const minAdd=smallestSum(nums,start,need),maxAdd=largestSum(nums,start,need);if(f.sumMax!==null&&sum+minAdd>f.sumMax)return;if(f.sumMin!==null&&sum+maxAdd<f.sumMin)return;}
     if(f.width&&depth>=2&&selected[depth-1]-selected[0]>f.widthMax&&f.widthMax!==null)return;
@@ -41,25 +44,29 @@ function* search(){
     if(need===0){
       if(f.parity&&(even<f.evenMin||even>f.evenMax||(pick-even)<f.oddMin||(pick-even)>f.oddMax))return;
       if(f.sum&&((f.sumMin!==null&&sum<f.sumMin)||(f.sumMax!==null&&sum>f.sumMax)))return;
+      if(f.prime&&(primes<f.primeMin||primes>f.primeMax))return;
+      if(f.low&&(low<f.lowMin||low>f.lowMax))return;
+      if(f.fib&&(fibCount<f.fibMin||fibCount>f.fibMax))return;
+      if(f.multiple&&(multipleCount<f.multipleMin||multipleCount>f.multipleMax))return;
       if(f.width&&((f.widthMin!==null&&selected[pick-1]-selected[0]<f.widthMin)||(f.widthMax!==null&&selected[pick-1]-selected[0]>f.widthMax)))return;
-      if(f.decades&&decadeCounts.size<f.minDecades)return;
+      if(f.decades&&(decadeCounts.size<f.minDecades||decadeCounts.size>f.maxDecades))return;
       if(f.previous&&(repeatCount<f.repeatMin||repeatCount>f.repeatMax))return;
-      if(f.lists&&required.some(n=>!selected.includes(n)))return;
-      if(f.ending&&Math.max(...endingCounts)>f.maxPerEnding)return;
+      if(required.some(n=>!selected.includes(n)))return;
+      if(f.ending&&(Math.max(...endingCounts)>f.maxPerEnding||endingCounts.filter(v=>v>0).length<f.minDistinctEndings||endingCounts.filter(v=>v>0).length>f.maxDistinctEndings))return;
       if(f.decades&&Math.max(...decadeCounts.values())>f.maxPerDecade)return;
       const combo=selected.slice();let consecPairs=0;for(let i=1;i<combo.length;i++)if(combo[i]===combo[i-1]+1)consecPairs++;
-      if(f.consecutive&&consecPairs>f.maxConsecutive)return;
+      if(f.consecutive&&(consecPairs<f.minConsecutive||consecPairs>f.maxConsecutive))return;
       yield {combo,sum,even,primes};return;
     }
     for(let i=start;i<=nums.length-need;i++){
       const n=nums[i], prev=depth?selected[depth-1]:null;
-      if(f.lists&&required.some(r=>!selected.includes(r))){let possible=true;for(const r of required)if(!selected.includes(r)&&r<n){possible=false;break;}if(!possible)continue;}
+      if(required.some(r=>!selected.includes(r))){let possible=true;for(const r of required)if(!selected.includes(r)&&r<n){possible=false;break;}if(!possible)continue;}
       const e=even+(n%2===0?1:0),p=primes+(isPrime[n]?1:0),s=sum+n;
-      if(f.parity&&(e>f.evenMax||((selected.length+1)-e)>f.oddMax))continue;if(f.prime&&p>f.primes)continue;if(f.sum&&f.sumMax!==null&&s>f.sumMax)continue;
+      if(f.parity&&(e>f.evenMax||((selected.length+1)-e)>f.oddMax))continue;if(f.prime&&p>f.primeMax)continue;if(f.sum&&f.sumMax!==null&&s>f.sumMax)continue;
       const con=consecutive+(prev!==null&&n===prev+1?1:0);if(f.consecutive&&con>f.maxConsecutive)continue;
-      const lo=low+(n<=half?1:0);if(f.low&&lo>f.lowCount)continue;
-      const fc=fibCount+(fib[n]?1:0);if(f.fib&&fc>f.fibCount)continue;
-      const mc=multipleCount+(n%f.multipleOf===0?1:0);if(f.multiple&&mc>f.multipleCount)continue;
+      const lo=low+(n<=half?1:0);if(f.low&&lo>f.lowMax)continue;
+      const fc=fibCount+(fib[n]?1:0);if(f.fib&&fc>f.fibMax)continue;
+      const mc=multipleCount+(n%f.multipleOf===0?1:0);if(f.multiple&&mc>f.multipleMax)continue;
       const rc=repeatCount+(f.previous&&f.previousSet.has(n)?1:0);if(f.previous&&rc>f.repeatMax)continue;
       const dec=Math.floor((n-min)/10),dc=(decadeCounts.get(dec)||0)+1;if(f.decades&&dc>f.maxPerDecade)continue;
       const end=n%10,ec=endingCounts[end]+1;if(f.ending&&ec>f.maxPerEnding)continue;

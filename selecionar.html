@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101522">
+<title>Selecionar números • Combi Analyzer</title><link rel="stylesheet" href="style.css">
+<style>
+.picker-shell{max-width:1050px;margin:0 auto;padding:28px 20px 60px}.picker-panel{background:var(--panel,#171f30);border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:24px}.picker-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.picker-head h1{margin:0;font-size:clamp(24px,4vw,34px)}.picker-tools{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.picker-tools input{max-width:180px}.number-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:9px}.pick-number{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;border-radius:10px;padding:13px 4px;font-weight:700;cursor:pointer}.pick-number.selected{background:#7765e8;border-color:#9b8eff;color:white}.picker-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:24px}.picker-footer strong{font-size:18px}.picker-help{color:var(--muted,#aab2c5);margin-top:8px}.picker-actions{display:flex;gap:10px;flex-wrap:wrap}
+</style>
+</head><body>
+<main class="picker-shell"><header class="topbar"><a class="brand" href="index.html"><span class="brand-mark">C</span><span>COMBI<span class="brand-light">ANALYZER</span></span></a><span class="version">SELEÇÃO MANUAL</span></header>
+<section class="hero"><div><p class="eyebrow">PERSONALIZE SEU UNIVERSO</p><h1>Fixe seus números<span>.</span></h1><p class="subtitle" id="rangeText">Marque os números que devem aparecer obrigatoriamente em todas as cartelas.</p></div></section>
+<section class="picker-panel"><div class="picker-head"><div><h1>Números disponíveis</h1><p class="picker-help">Os números selecionados serão fixos: aparecerão em todas as cartelas geradas. Os demais serão completados automaticamente.</p></div><strong id="selectedCount">0 selecionados</strong></div>
+<div class="picker-tools"><input id="searchNumber" type="number" min="0" placeholder="Localizar número"><button class="secondary-button" id="selectAll" type="button">Selecionar todos</button><button class="secondary-button" id="selectNone" type="button">Limpar</button><button class="secondary-button" id="invert" type="button">Inverter seleção</button></div>
+<div class="number-grid" id="numberGrid"></div>
+<div class="picker-footer"><div><strong id="footerCount">0 números selecionados</strong><p class="picker-help">Cada cartela terá o tamanho definido na aba principal. Os números fixos serão incluídos em todas elas.</p></div><div class="picker-actions"><button class="secondary-button" id="cancel" type="button">Cancelar</button><button class="primary-button" id="confirm" type="button">Fixar números selecionados</button></div></div>
+</section></main>
+<script>
+const params=new URLSearchParams(location.search);const min=Math.max(0,Number(params.get('min')??1));const max=Math.max(min,Math.min(100000,Number(params.get('max')??90)));const POOL_KEY='combiAnalyzerSelectedNumbersV10';let saved=[];try{saved=JSON.parse(localStorage.getItem(POOL_KEY))||[];}catch{}const chosen=new Set(saved.filter(n=>Number.isInteger(n)&&n>=min&&n<=max));
+const grid=document.getElementById('numberGrid');const count=document.getElementById('selectedCount');const footer=document.getElementById('footerCount');
+document.getElementById('rangeText').textContent=`Intervalo disponível: ${min} até ${max}. Selecione os números que serão obrigatórios em todos os jogos.`;
+function update(){count.textContent=`${chosen.size} selecionados`;footer.textContent=`${chosen.size} números selecionados`;grid.querySelectorAll('button').forEach(b=>b.classList.toggle('selected',chosen.has(Number(b.dataset.n))));}
+for(let n=min;n<=max;n++){const b=document.createElement('button');b.type='button';b.className='pick-number';b.textContent=n;b.dataset.n=n;b.addEventListener('click',()=>{chosen.has(n)?chosen.delete(n):chosen.add(n);update();});grid.appendChild(b);}
+document.getElementById('selectAll').onclick=()=>{for(let n=min;n<=max;n++)chosen.add(n);update();};
+document.getElementById('selectNone').onclick=()=>{chosen.clear();update();};
+document.getElementById('invert').onclick=()=>{for(let n=min;n<=max;n++)chosen.has(n)?chosen.delete(n):chosen.add(n);update();};
+document.getElementById('searchNumber').addEventListener('input',e=>{const n=Number(e.target.value);const b=grid.querySelector(`[data-n="${n}"]`);if(b){b.scrollIntoView({behavior:'smooth',block:'center'});b.focus();}});
+document.getElementById('cancel').onclick=()=>window.close();
+update();
+document.getElementById('confirm').onclick=()=>{if(!chosen.size){alert('Selecione pelo menos um número.');return;}const numbers=[...chosen].sort((a,b)=>a-b);localStorage.setItem(POOL_KEY,JSON.stringify(numbers));if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'combi-fixed-numbers',numbers},location.origin);window.close();}else{alert('Seleção guardada. Volte à aba principal e atualize a página.');}};
+</script></body></html>
