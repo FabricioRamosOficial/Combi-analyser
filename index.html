@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101522">
-<title>Combi Analyzer v4</title><link rel="stylesheet" href="style.css">
+<title>Combi Analyzer v6</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="app-shell">
-<header class="topbar"><a class="brand" href="#"><span class="brand-mark">C</span><span>COMBI<span class="brand-light">ANALYZER</span></span></a><span class="version">V4.0 </span></header>
+<header class="topbar"><a class="brand" href="#"><span class="brand-mark">C</span><span>COMBI<span class="brand-light">ANALYZER</span></span></a><span class="version">V6.0 •</span></header>
 <section class="hero"><div><p class="eyebrow">LABORATÓRIO DE ANÁLISE COMBINATÓRIA</p><h1>Explore possibilidades<span>.</span></h1><p class="subtitle">Filtros aplicados durante a geração, não depois dela.</p></div><div class="hero-orbit" aria-hidden="true"><span>01</span><span>02</span><span>03</span><b>∑</b></div></section>
 <section class="workspace">
 <aside class="panel config-panel">
@@ -18,7 +18,7 @@
 <label class="wide">Tamanho do lote de gravação<input id="groupSize" type="number" min="100" value="10000"><small>Quantidade de resultados por bloco salvo.</small></label>
 </div>
 <div class="divider"></div><div class="panel-heading filters-heading"><div><span class="step">02</span><h2>Filtros</h2></div><button class="text-button" id="clearFilters" type="button">Limpar filtros</button></div>
-<div class="filter-card"><div class="filter-title"><div><strong>Paridade</strong><small>Quantidade exata de pares</small></div><label class="switch"><input id="parityEnabled" type="checkbox"><span></span></label></div><div class="filter-options"><label>Quantidade de pares<input id="evenCount" type="number" min="0" value="8"></label></div></div>
+<div class="filter-card"><div class="filter-title"><div><strong>Paridade</strong><small>Defina limites ou deixe em branco para aceitar qualquer quantidade</small></div><label class="switch"><input id="parityEnabled" type="checkbox"><span></span></label></div><div class="filter-options two-col"><label>Mínimo de pares<input id="evenMin" type="number" min="0" placeholder="Qualquer"></label><label>Máximo de pares<input id="evenMax" type="number" min="0" placeholder="Qualquer"></label><label>Mínimo de ímpares<input id="oddMin" type="number" min="0" placeholder="Qualquer"></label><label>Máximo de ímpares<input id="oddMax" type="number" min="0" placeholder="Qualquer"></label></div><small>Exemplo: pares entre 5 e 10 e ímpares entre 5 e 10. Os limites podem ficar vazios.</small></div>
 <div class="filter-card"><div class="filter-title"><div><strong>Números primos</strong><small>Quantidade de primos na combinação</small></div><label class="switch"><input id="primeEnabled" type="checkbox"><span></span></label></div><div class="filter-options"><label>Quantidade de primos<input id="primeCount" type="number" min="0" value="4"></label></div></div>
 <div class="filter-card"><div class="filter-title"><div><strong>Soma</strong><small>Faixa da soma total</small></div><label class="switch"><input id="sumEnabled" type="checkbox"><span></span></label></div><div class="filter-options two-col"><label>Mínima<input id="sumMin" type="number" placeholder="Livre"></label><label>Máxima<input id="sumMax" type="number" placeholder="Livre"></label></div></div>
 <div class="filter-card"><div class="filter-title"><div><strong>Consecutivos</strong><small>Limite de pares adjacentes (ex.: 10–11)</small></div><label class="switch"><input id="consecutiveEnabled" type="checkbox"><span></span></label></div><div class="filter-options"><label>Máximo de pares consecutivos<input id="maxConsecutive" type="number" min="0" value="3"></label></div></div>
@@ -37,8 +37,9 @@
 <div class="progress-section"><div class="progress-label"><span>Progresso da busca</span><strong id="progressText">0%</strong></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><small id="progressNote">A busca termina ao atingir a quantidade solicitada ou esgotar as possibilidades.</small></div>
 <div class="results-toolbar"><div><strong>Prévia das combinações</strong><small>Exibindo até 100 resultados</small></div><button class="secondary-button export-button" id="exportBtn" disabled>↓ Exportar CSV</button></div>
 <div class="table-wrap"><table><thead><tr><th>#</th><th>COMBINAÇÃO</th><th>SOMA</th><th>PARES</th><th>PRIMOS</th><th>GRUPO</th></tr></thead><tbody id="resultsBody"><tr class="empty-row"><td colspan="6">Configure os parâmetros e clique em “Gerar combinações”.</td></tr></tbody></table></div><div class="results-footer"><span id="previewCount">0 resultados na prévia</span><span id="groupInfo">Grupos: —</span></div></section>
-
+<div class="notice"><span class="notice-icon">i</span><p><strong>Como a V5 é mais rápida</strong><br>O motor faz poda durante a construção: se uma combinação parcial já não pode cumprir paridade, primos, soma ou outros limites, abandona esse ramo sem gerar todas as combinações descendentes. A quantidade desejada limita a busca; 0 significa procurar todas as válidas, o que pode levar muito tempo e ocupar bastante espaço.</p></div>
+<div class="notice neutral"><span class="notice-icon">!</span><p><strong>Estatística não é previsão</strong><br>Paridade, soma, dezenas, finais, frequência e padrões descrevem combinações e resultados anteriores. Em sorteios justos, cada combinação válida tem a mesma probabilidade individual.</p></div>
 </div></section>
-<footer>COMBI ANALYZER V4 <span>•</span> By FabricioRamos</footer>
+<footer>COMBI ANALYZER V6 <span>•</span> By <a href="https://github.com/FabricioRamosOficial">By FabricioRamos</a></footer>
 </main><script src="script.js"></script>
 </body></html>
