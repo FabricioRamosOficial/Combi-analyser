@@ -2,24 +2,25 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101522">
-<title>Combi Analyzer v11</title><link rel="stylesheet" href="style.css">
+<title>Combi Analyzer v14</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="app-shell">
-<header class="topbar"><a class="brand" href="#"><span class="brand-mark">C</span><span>COMBI<span class="brand-light">ANALYZER</span></span></a><span class="version">V11.0 • </span></header>
-<section class="hero"><div><p class="eyebrow">LABORATÓRIO DE ANÁLISE COMBINATÓRIA</p><h1>Explore possibilidades<span>.</span></h1><p class="subtitle">Filtros aplicados durante a geração, não depois dela.</p></div><div class="hero-orbit" aria-hidden="true"><span>01</span><span>02</span><span>03</span><b>∑</b></div></section>
+<header class="topbar"><a class="brand" href="#"><span class="brand-mark">C</span><span>COMBI<span class="brand-light">ANALYZER</span></span></a><span class="version">V14.0 • FREQUÊNCIA GLOBAL</span></header>
+<section class="hero"><div><p class="eyebrow">LABORATÓRIO DE ANÁLISE COMBINATÓRIA</p><h1>Explore possibilidades<span>.</span></h1><p class="subtitle">Filtros individuais e frequência global do conjunto final.</p></div><div class="hero-orbit" aria-hidden="true"><span>01</span><span>02</span><span>03</span><b>∑</b></div></section>
 <section class="workspace">
 <aside class="panel config-panel">
 <div class="panel-heading"><div><span class="step">01</span><h2>Configuração</h2></div><span class="heading-note">PARÂMETROS</span></div>
 <div class="field-grid">
 <label>Valor inicial<input id="minNumber" type="number" min="0" value="1"></label><label>Valor final<input id="maxNumber" type="number" min="1" value="90"></label>
-<label class="wide">Números por combinação<input id="pickCount" type="number" min="1" value="15"></label>
-<label class="wide">Combinações desejadas<input id="targetCount" type="number" min="0" value="0"><small>Ex.: 15. Use 0 para tentar gerar todas as combinações válidas.</small></label>
+<label class="wide">Números por combinação<input id="pickCount" type="number" min="1" value="10"></label>
+<label class="wide">Modo de geração<select id="generationMode"><option value="sequential">Sequencial (ordem crescente)</option><option value="random">Aleatório (sem repetir cartelas)</option></select><small id="modeHelp">Gera as combinações na ordem crescente dos números.</small></label>
+<label class="wide">Combinações desejadas<input id="targetCount" type="number" min="0" value="0"><small>Use 0 para gerar todas as combinações válidas do universo selecionado.</small></label>
 
 </div>
 <div class="number-pool-card">
-  <div><strong>Números fixos nas cartelas</strong><small id="poolSummary">Usando todos os números do intervalo.</small></div>
-  <button class="secondary-button" id="openPickerBtn" type="button">＋ Escolher números fixos</button>
+  <div><strong>Universo de números selecionados</strong><small id="poolSummary">Selecione os números candidatos e escolha quantos números formarão cada cartela.</small></div>
+  <button class="secondary-button" id="openPickerBtn" type="button">＋ Escolher universo de números</button>
   <button class="text-button" id="clearPoolBtn" type="button" hidden>Limpar seleção</button>
 </div>
 <div class="divider"></div><div class="panel-heading filters-heading"><div><span class="step">02</span><h2>Filtros</h2></div><button class="text-button" id="clearFilters" type="button">Limpar filtros</button></div>
@@ -35,14 +36,15 @@
 <div class="filter-card"><div class="filter-title"><div><strong>Múltiplos</strong><small>Quantidade de múltiplos de um número escolhido</small></div><label class="switch"><input id="multipleEnabled" type="checkbox"><span></span></label></div><div class="filter-options two-col"><label>Múltiplo de<input id="multipleOf" type="number" min="2" value="3"></label><label>Mínimo de múltiplos<input id="multipleMin" type="number" min="0" placeholder="Qualquer"></label><label>Máximo de múltiplos<input id="multipleMax" type="number" min="0" placeholder="Qualquer"></label></div></div>
 <div class="filter-card"><div class="filter-title"><div><strong>Números obrigatórios / excluídos</strong><small>Separe os números por vírgula</small></div><label class="switch"><input id="listsEnabled" type="checkbox"><span></span></label></div><div class="filter-options"><label>Obrigatórios<input id="includeNumbers" type="text" placeholder="Ex.: 3, 7, 12"></label><label>Excluir<input id="excludeNumbers" type="text" placeholder="Ex.: 8, 19, 25"></label></div></div>
 <div class="filter-card"><div class="filter-title"><div><strong>Repetidos do último resultado</strong><small>Conta quantos números se repetem do concurso anterior</small></div><label class="switch"><input id="previousEnabled" type="checkbox"><span></span></label></div><div class="filter-options"><label>Último resultado<input id="previousNumbers" type="text" placeholder="Ex.: 2, 5, 8, 11, 14"></label><div class="two-col"><label>Mínimo repetidos<input id="repeatMin" type="number" min="0" placeholder="0"></label><label>Máximo repetidos<input id="repeatMax" type="number" min="0" placeholder="Livre"></label></div></div></div>
+<div class="filter-card frequency-card"><div class="filter-title"><div><strong>Frequência global (Mono a Quina)</strong><small>Quantidade de números que devem aparecer exatamente esse número de vezes no conjunto final de cartelas. Deixe vazio para não impor limite.</small></div><label class="switch"><input id="frequencyEnabled" type="checkbox"><span></span></label></div><div class="filter-options two-col"><label>Mono — aparece 1 vez<input id="monoCount" type="number" min="0" step="1" placeholder="Qualquer"></label><label>Duque — aparece 2 vezes<input id="duqueCount" type="number" min="0" step="1" placeholder="Qualquer"></label><label>Terno — aparece 3 vezes<input id="ternoCount" type="number" min="0" step="1" placeholder="Qualquer"></label><label>Quadra — aparece 4 vezes<input id="quadraCount" type="number" min="0" step="1" placeholder="Qualquer"></label><label>Quina — aparece 5 vezes<input id="quinaCount" type="number" min="0" step="1" placeholder="Qualquer"></label></div><small>Exemplo: Mono = 5 exige exatamente cinco números diferentes presentes em apenas uma cartela. O cálculo considera todas as cartelas finais, não cada cartela isoladamente. Informe X em “Combinações desejadas” para selecionar X cartelas; 0 usa todas as combinações válidas.</small></div>
 <button class="primary-button" id="generateBtn"><span>▶</span> Gerar combinações</button><div class="action-row"><button class="secondary-button" id="pauseBtn" disabled>Ⅱ Pausar</button><button class="secondary-button danger-button" id="stopBtn" disabled>■ Parar</button></div><p class="privacy-note">Processamento local no navegador. Nenhum dado é enviado.</p>
 </aside>
 <div class="results-column"><section class="panel results-panel"><div class="panel-heading"><div><span class="step">03</span><h2>Resultados</h2></div><span class="live-status" id="status"><i></i> AGUARDANDO</span></div>
-<div class="stats-grid"><div class="stat-card"><small>UNIVERSO BRUTO</small><strong id="totalPossible">—</strong><span>Combinações antes dos filtros</span></div><div class="stat-card accent-stat"><small>APROVADAS</small><strong id="totalFound">0</strong><span>Combinações válidas encontradas</span></div><div class="stat-card"><small>NÓS ANALISADOS</small><strong id="totalProcessed">0</strong><span>Estados avaliados pelo motor</span></div></div>
+<div class="stats-grid"><div class="stat-card"><small>UNIVERSO BRUTO</small><strong id="totalPossible">—</strong><span>Combinações do universo antes dos filtros</span></div><div class="stat-card accent-stat"><small>APROVADAS</small><strong id="totalFound">0</strong><span>Combinações válidas encontradas</span></div><div class="stat-card"><small>NÓS ANALISADOS</small><strong id="totalProcessed">0</strong><span>Estados avaliados pelo motor</span></div></div>
 <div class="progress-section"><div class="progress-label"><span>Progresso da busca</span><strong id="progressText">0%</strong></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><small id="progressNote">A busca termina ao atingir a quantidade solicitada ou esgotar as possibilidades.</small></div>
-<div class="results-toolbar"><div><strong>Prévia das combinações</strong><small>Exibindo até 100 resultados</small></div><button class="secondary-button export-button" id="exportBtn" disabled>↓ Exportar CSV</button></div>
+<div id="frequencySummary" class="notice neutral" hidden><span class="notice-icon">✓</span><p><strong>Frequência global confirmada</strong><br><span id="frequencySummaryText"></span></p></div><div class="results-toolbar"><div><strong>Prévia das combinações</strong><small>Exibindo até 100 resultados</small></div><button class="secondary-button export-button" id="exportBtn" disabled>↓ Exportar CSV</button></div>
 <div class="table-wrap"><table><thead><tr><th>#</th><th>COMBINAÇÃO</th><th>SOMA</th><th>PARES</th><th>PRIMOS</th><th>GRUPO</th></tr></thead><tbody id="resultsBody"><tr class="empty-row"><td colspan="6">Configure os parâmetros e clique em “Gerar combinações”.</td></tr></tbody></table></div><div class="results-footer"><span id="previewCount">0 resultados na prévia</span><span id="groupInfo">Grupos: —</span></div></section>
 </div></section>
-<footer>COMBI ANALYZER V11 <span>•</span> <a href="https://github.com/FabricioRamosOficial" target="_blank">By FabricioRamo</footer>
+<footer>COMBI ANALYZER V14 <span>•</span> SELEÇÃO MANUAL E FILTROS FLEXÍVEIS</footer>
 </main><script src="script.js"></script>
 </body></html>
