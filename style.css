@@ -4,3 +4,9 @@
 .filter-options .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}.filter-options>label{min-width:0}.filter-options input[type=text]{text-transform:none}.neutral{border-color:#34445d;background:#172233;color:#aebbd0}.neutral .notice-icon{border-color:#6b86ad;color:#9eb9e6}.neutral strong{color:#c8d9f5}#progressNote{display:block;margin-top:8px;color:#7f8ea5;font-size:9px;line-height:1.5}.filter-card .filter-options .two-col{margin-top:0}
 
 .number-pool-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:15px;margin:16px 0;background:rgba(119,101,232,.08);border:1px solid rgba(119,101,232,.28);border-radius:12px}.number-pool-card>div{display:flex;flex-direction:column;gap:4px}.number-pool-card small{color:var(--muted,#aab2c5)}.number-pool-card [hidden]{display:none!important}
+
+/* V15 — campos de intervalo da frequência global */
+.frequency-range{padding:12px;border:1px solid var(--border, #e5e7eb);border-radius:12px;margin:8px 0;background:rgba(127,127,127,.035)}
+.frequency-range>strong{display:block;margin-bottom:9px}
+.frequency-range>strong small{display:inline;font-weight:400;opacity:.7;margin-left:5px}
+.frequency-range .two-col{gap:10px}

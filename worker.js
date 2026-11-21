@@ -1,4 +1,4 @@
-/* Combi Analyzer V14: geração sequencial/aleatória e frequência global Mono–Quina. */
+/* Combi Analyzer V15: geração sequencial/aleatória e frequência global Mono–Quina. */
 let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[];
 const CHUNK_NODES=50000, SEND_BATCH=500;
 self.onmessage=({data})=>{
@@ -36,14 +36,14 @@ function* searchWithFrequency(){
   if(wanted>candidates.length){yield {distributionError:`Foram encontradas apenas ${candidates.length.toLocaleString('pt-BR')} cartelas válidas, mas você pediu ${wanted.toLocaleString('pt-BR')}. Reduza a quantidade desejada ou ajuste os filtros.`};return;}
   const targets=cfg.filters.frequencyTargets;
   const keys=['mono','duque','terno','quadra','quina'];
-  const constrained=keys.filter(k=>targets[k]!==null);
+  const constrained=keys.filter(k=>targets[k]&&(targets[k].min!==null||targets[k].max!==null));
   const maxNumber=cfg.max;
   const scoreSet=indices=>{
     const appearances=new Uint32Array(maxNumber+1);
     for(const idx of indices)for(const n of candidates[idx].combo)appearances[n]++;
     const hist={mono:0,duque:0,terno:0,quadra:0,quina:0};
     for(let n=cfg.min;n<=maxNumber;n++){const f=appearances[n];if(f>=1&&f<=5)hist[keys[f-1]]++;}
-    let score=0;for(const k of constrained)score+=Math.abs(hist[k]-targets[k]);
+    let score=0;for(const k of constrained){const range=targets[k];if(range.min!==null&&hist[k]<range.min)score+=range.min-hist[k];if(range.max!==null&&hist[k]>range.max)score+=hist[k]-range.max;}
     return {score,hist};
   };
   let best=null,bestScore=Infinity;
@@ -64,12 +64,12 @@ function* searchWithFrequency(){
     }
   }
   if(!best||bestScore!==0){
-    const detail=best?keys.filter(k=>targets[k]!==null).map(k=>`${k}: pedido ${targets[k]}, melhor resultado ${best.hist[k]}`).join(' | '):'Não foi possível avaliar a distribuição.';
+    const detail=best?constrained.map(k=>`${k}: pedido ${targets[k].min??'—'} a ${targets[k].max??'—'}, melhor resultado ${best.hist[k]}`).join(' | '):'Não foi possível avaliar a distribuição.';
     yield {distributionError:`A busca não localizou um conjunto de ${wanted.toLocaleString('pt-BR')} cartelas que cumpra exatamente todos os valores Mono–Quina. Melhor aproximação encontrada: ${detail}. Isso não prova que seja impossível; tente alterar os valores ou a quantidade de cartelas.`};return;
   }
   if(cfg.mode==='sequential')best.indices.sort((a,b)=>a-b);
   const labels={mono:'Mono',duque:'Duque',terno:'Terno',quadra:'Quadra',quina:'Quina'};
-  self.postMessage({type:'frequencySummary',text:keys.map(k=>`${labels[k]}: ${best.hist[k]}`).join(' • ')});
+  self.postMessage({type:'frequencySummary',text:keys.map(k=>{const r=targets[k];const rule=r&&(r.min!==null||r.max!==null)?` (pedido ${r.min??'—'} a ${r.max??'—'})`:'';return `${labels[k]}: ${best.hist[k]}${rule}`;}).join(' • ')});
   for(const idx of best.indices)yield candidates[idx];
 }
 function* searchSequential(){
