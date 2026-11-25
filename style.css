@@ -5,7 +5,7 @@
 
 .number-pool-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:15px;margin:16px 0;background:rgba(119,101,232,.08);border:1px solid rgba(119,101,232,.28);border-radius:12px}.number-pool-card>div{display:flex;flex-direction:column;gap:4px}.number-pool-card small{color:var(--muted,#aab2c5)}.number-pool-card [hidden]{display:none!important}
 
-/* V15 — campos de intervalo da frequência global */
+/* V17 — campos de intervalo da frequência global */
 .frequency-range{padding:12px;border:1px solid var(--border, #e5e7eb);border-radius:12px;margin:8px 0;background:rgba(127,127,127,.035)}
 .frequency-range>strong{display:block;margin-bottom:9px}
 .frequency-range>strong small{display:inline;font-weight:400;opacity:.7;margin-left:5px}

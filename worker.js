@@ -1,4 +1,4 @@
-/* Combi Analyzer V17: geração sequencial/aleatória e frequência global Mono–Quina. */
+/* Combi Analyzer V18: geração sequencial/aleatória e frequência global Mono–Quina. */
 let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[], partialReason='';
 const CHUNK_NODES=50000, SEND_BATCH=500;
 self.onmessage=({data})=>{
@@ -23,7 +23,7 @@ function* search(){
 function* searchBase(){ if(cfg.mode==='random'){yield* searchRandom();return;} yield* searchSequential(); }
 
 // Os filtros Mono–Quina descrevem a distribuição de frequência do conjunto inteiro.
-// A V17 constrói primeiro uma meta de aparições por número e depois seleciona
+// A V18 constrói primeiro uma meta de aparições por número e depois seleciona
 // cartelas válidas que realizem essa meta, em vez de testar subconjuntos aleatórios.
 function* searchWithFrequency(){
   const candidates=[];
