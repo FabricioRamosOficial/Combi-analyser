@@ -1,5 +1,5 @@
-/* Combi Analyzer V15: geração sequencial/aleatória e frequência global Mono–Quina. */
-let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[];
+/* Combi Analyzer V17: geração sequencial/aleatória e frequência global Mono–Quina. */
+let paused=false, stopped=false, iterator=null, cfg=null, processed=0, found=0, pending=[], partialReason='';
 const CHUNK_NODES=50000, SEND_BATCH=500;
 self.onmessage=({data})=>{
   if(data.type==='start') start(data.config);
@@ -7,7 +7,7 @@ self.onmessage=({data})=>{
   if(data.type==='resume'){paused=false;schedule();}
   if(data.type==='stop'){stopped=true;paused=false;schedule();}
 };
-function start(c){cfg=c;paused=false;stopped=false;processed=0;found=0;pending=[];iterator=search();schedule();}
+function start(c){cfg=c;paused=false;stopped=false;processed=0;found=0;pending=[];partialReason='';iterator=search();schedule();}
 function schedule(){if(!paused)setTimeout(runChunk,0);}
 function runChunk(){if(paused)return;if(stopped){finish('stopped');return;}let nodes=0;
   while(nodes<CHUNK_NODES&&!paused&&!stopped){const step=iterator.next();if(step.done){flush();finish('done');return;}nodes++;processed++;
@@ -23,8 +23,8 @@ function* search(){
 function* searchBase(){ if(cfg.mode==='random'){yield* searchRandom();return;} yield* searchSequential(); }
 
 // Os filtros Mono–Quina descrevem a distribuição de frequência do conjunto inteiro.
-// Por isso, primeiro reunimos as cartelas que passam pelos filtros individuais e,
-// depois, procuramos um subconjunto com a distribuição global solicitada.
+// A V17 constrói primeiro uma meta de aparições por número e depois seleciona
+// cartelas válidas que realizem essa meta, em vez de testar subconjuntos aleatórios.
 function* searchWithFrequency(){
   const candidates=[];
   for(const item of searchBase()){
@@ -32,45 +32,165 @@ function* searchWithFrequency(){
     else if(item && item.tick)yield item;
   }
   if(!candidates.length){yield {distributionError:'Nenhuma cartela passou pelos filtros individuais. Reduza ou desative alguns filtros e tente novamente.'};return;}
-  const wanted=cfg.targetCount>0?cfg.targetCount:candidates.length;
-  if(wanted>candidates.length){yield {distributionError:`Foram encontradas apenas ${candidates.length.toLocaleString('pt-BR')} cartelas válidas, mas você pediu ${wanted.toLocaleString('pt-BR')}. Reduza a quantidade desejada ou ajuste os filtros.`};return;}
-  const targets=cfg.filters.frequencyTargets;
+  const requested=cfg.targetCount;
+  const wanted=requested>0?Math.min(requested,candidates.length):candidates.length;
+  if(requested>0&&candidates.length<requested)partialReason=`Os filtros individuais aprovaram ${candidates.length.toLocaleString('pt-BR')} cartelas, abaixo das ${requested.toLocaleString('pt-BR')} solicitadas. O programa tentará entregar o maior conjunto que também respeite Mono–Quina.`;
   const keys=['mono','duque','terno','quadra','quina'];
-  const constrained=keys.filter(k=>targets[k]&&(targets[k].min!==null||targets[k].max!==null));
-  const maxNumber=cfg.max;
-  const scoreSet=indices=>{
-    const appearances=new Uint32Array(maxNumber+1);
-    for(const idx of indices)for(const n of candidates[idx].combo)appearances[n]++;
+  const ranges=cfg.filters.frequencyTargets;
+  const constrained=keys.filter(k=>ranges[k]&&(ranges[k].min!==null||ranges[k].max!==null));
+  if(cfg.targetCount===0 && wanted===candidates.length){
+    const appearances=new Map();
+    for(const item of candidates)for(const n of item.combo)appearances.set(n,(appearances.get(n)||0)+1);
     const hist={mono:0,duque:0,terno:0,quadra:0,quina:0};
-    for(let n=cfg.min;n<=maxNumber;n++){const f=appearances[n];if(f>=1&&f<=5)hist[keys[f-1]]++;}
-    let score=0;for(const k of constrained){const range=targets[k];if(range.min!==null&&hist[k]<range.min)score+=range.min-hist[k];if(range.max!==null&&hist[k]>range.max)score+=hist[k]-range.max;}
-    return {score,hist};
+    for(const count of appearances.values())if(count>=1&&count<=5)hist[keys[count-1]]++;
+    const valid=constrained.every(k=>{const r=ranges[k];return (r.min===null||hist[k]>=r.min)&&(r.max===null||hist[k]<=r.max);});
+    if(!valid){
+      const detail=constrained.map(k=>`${k}: pedido ${ranges[k].min??'—'} a ${ranges[k].max??'—'}, resultado ${hist[k]}`).join(' | ');
+      yield {distributionError:`Você pediu todas as ${wanted.toLocaleString('pt-BR')} cartelas válidas. A frequência global dessas cartelas é determinada pelo próprio universo e não pode ser redistribuída. Resultado encontrado: ${detail}. Reduza a quantidade desejada para permitir selecionar um subconjunto.`};return;
+    }
+    const labels={mono:'Mono',duque:'Duque',terno:'Terno',quadra:'Quadra',quina:'Quina'};
+    self.postMessage({type:'frequencySummary',text:keys.map(k=>{const r=ranges[k];const rule=r&&(r.min!==null||r.max!==null)?` (pedido ${r.min??'—'} a ${r.max??'—'})`:'';return `${labels[k]}: ${hist[k]}${rule}`;}).join(' • ')});
+    for(const item of candidates)yield item;
+    return;
+  }
+  const availableSet=new Set();
+  for(const c of candidates)for(const n of c.combo)availableSet.add(n);
+  const available=[...availableSet].sort((a,b)=>a-b);
+  const minHist=keys.reduce((sum,k)=>sum+(ranges[k]?.min??0),0);
+  if(minHist>available.length){yield {distributionError:`Os mínimos Mono–Quina somam ${minHist}, mas só existem ${available.length} números presentes nas cartelas válidas.`};return;}
+
+  let chosenBest=null,bestHist=null;
+  let bestPartial=null,bestPartialHist=null;
+  const maxAttempts=8, samplesPerRow=Math.min(16000,Math.max(4000,Math.ceil(candidates.length/200)));
+  const rngState={seed:0x16a09e66};
+  const rng=()=>{rngState.seed=(1664525*rngState.seed+1013904223)>>>0;return rngState.seed/4294967296;};
+  const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const isValidHist=hist=>constrained.every(k=>{const r=ranges[k];return (r.min===null||hist[k]>=r.min)&&(r.max===null||hist[k]<=r.max);});
+  const getHist=rows=>{
+    const freq=new Map();
+    for(const idx of rows)for(const n of candidates[idx].combo)freq.set(n,(freq.get(n)||0)+1);
+    const hist={mono:0,duque:0,terno:0,quadra:0,quina:0};
+    for(const v of freq.values())if(v>=1&&v<=5)hist[keys[v-1]]++;
+    return hist;
   };
-  let best=null,bestScore=Infinity;
-  if(wanted===candidates.length){
-    const indices=Array.from({length:candidates.length},(_,i)=>i);const result=scoreSet(indices);best={indices,...result};bestScore=result.score;
-  }else{
-    let seed=0x12345678;const rng=cfg.mode==='random'?Math.random:()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
-    const attempts=Math.max(250,Math.min(1200,Math.floor(3000000/Math.max(1,wanted))));
-    for(let attempt=0;attempt<attempts;attempt++){
-      // Amostragem sem reposição em O(quantidade pedida), sem criar um vetor
-      // auxiliar do tamanho de todo o universo de cartelas a cada tentativa.
-      const chosen=new Set();
-      for(let j=candidates.length-wanted;j<candidates.length;j++){const t=Math.floor(rng()*(j+1));chosen.add(chosen.has(t)?j:t);}
-      const indices=[...chosen];const result=scoreSet(indices);
-      if(result.score<bestScore){bestScore=result.score;best={indices,hist:result.hist,score:result.score};}
-      if(result.score===0)break;
-      if(attempt%20===0)yield {tick:true};
+
+  // Tenta primeiro a meta pedida. Se não houver construção, reduz gradualmente
+  // a quantidade e recalcula a distribuição para cada tamanho. Assim o maior
+  // conjunto válido encontrado é preservado, em vez de descartar tudo.
+  const targetStep=Math.max(1,Math.ceil(wanted/100));
+  for(let targetSize=wanted;targetSize>0&&!chosenBest;targetSize-=targetStep){
+    if(bestPartial&&bestPartial.length>=targetSize)break;
+    const slots=targetSize*cfg.pick;
+    const histCounts={};
+    for(let i=0;i<5;i++){
+      const k=keys[i],r=ranges[k]||{min:null,max:null};
+      histCounts[k]=r.min!==null?r.min:0;
+    }
+    const lowCount=Object.values(histCounts).reduce((a,b)=>a+b,0);
+    const lowSlots=keys.reduce((sum,k,i)=>sum+histCounts[k]*(i+1),0);
+    if(lowCount>available.length||lowSlots>slots)continue;
+    const remainingSlots=slots-lowSlots;
+    const restCount=available.length-lowCount;
+    let activeCount=remainingSlots===0?0:Math.min(restCount,Math.floor(remainingSlots/6));
+    if(remainingSlots>0&&activeCount<cfg.pick)continue;
+    const base=activeCount?Math.floor(remainingSlots/activeCount):0;
+    const extra=activeCount?remainingSlots%activeCount:0;
+    if(activeCount>0&&(base<6||base>targetSize))continue;
+
+    const attempts=targetSize===wanted?maxAttempts:2;
+    for(let attempt=0;attempt<attempts&&!chosenBest;attempt++){
+      const pool=shuffle(available.slice());
+      const degree=new Map();let cursor=0;
+      for(let f=1;f<=5;f++)for(let j=0;j<histCounts[keys[f-1]];j++)degree.set(pool[cursor++],f);
+      const rest=pool.slice(cursor);
+      for(let j=0;j<activeCount;j++)degree.set(rest[j],base+(j<extra?1:0));
+      const desired=new Map(available.map(n=>[n,degree.get(n)||0]));
+      const remaining=new Map(desired);
+      const chosen=[],used=new Set();let failed=false;
+
+      for(let row=0;row<targetSize;row++){
+        const rowsLeft=targetSize-row,mandatory=new Set();
+        for(const [n,v] of remaining)if(v===rowsLeft)mandatory.add(n);
+        let bestIndex=-1,bestScore=-Infinity;
+        const tries=Math.min(candidates.length,samplesPerRow);
+        for(let t=0;t<tries;t++){
+          const idx=Math.floor(rng()*candidates.length);
+          if(used.has(idx))continue;
+          const combo=candidates[idx].combo;
+          let score=0,valid=true,mandatoryFound=0;
+          for(const n of combo){
+            const v=remaining.get(n)||0;
+            if(v===0||v>rowsLeft){valid=false;break;}
+            if(mandatory.has(n))mandatoryFound++;
+            const probability=v/rowsLeft;
+            score+=probability>=1?0:Math.log(probability/(1-probability));
+          }
+          if(!valid||mandatoryFound!==mandatory.size)continue;
+          if(score>bestScore||(score===bestScore&&rng()<0.5)){bestScore=score;bestIndex=idx;}
+        }
+        if(bestIndex<0){
+          for(let idx=0;idx<candidates.length;idx++){
+            if(used.has(idx))continue;
+            const combo=candidates[idx].combo;let valid=true,score=0,mandatoryFound=0;
+            for(const n of combo){
+              const v=remaining.get(n)||0;
+              if(v===0||v>rowsLeft){valid=false;break;}
+              if(mandatory.has(n))mandatoryFound++;
+              const p=v/rowsLeft;score+=p>=1?0:Math.log(p/(1-p));
+            }
+            if(!valid||mandatoryFound!==mandatory.size)continue;
+            if(score>bestScore){bestScore=score;bestIndex=idx;}
+          }
+        }
+        if(bestIndex<0){failed=true;break;}
+        used.add(bestIndex);chosen.push(bestIndex);
+        for(const n of candidates[bestIndex].combo)remaining.set(n,remaining.get(n)-1);
+        yield {tick:true};
+      }
+
+      if(chosen.length){
+        // Verifica cada prefixo com a frequência real do conjunto, não com a
+        // frequência planejada. Só guarda prefixos que cumprem todos os limites.
+        const checkLengths=failed?[chosen.length]:[chosen.length];
+        for(const len of checkLengths){
+          const prefix=chosen.slice(0,len),hist=getHist(prefix);
+          if(isValidHist(hist)&&(!bestPartial||prefix.length>bestPartial.length)){
+            bestPartial=prefix;bestPartialHist=hist;
+          }
+        }
+      }
+      if(!failed&&chosen.length===targetSize){
+        const hist=getHist(chosen);
+        if(isValidHist(hist)){chosenBest=chosen;bestHist=hist;break;}
+      }
     }
   }
-  if(!best||bestScore!==0){
-    const detail=best?constrained.map(k=>`${k}: pedido ${targets[k].min??'—'} a ${targets[k].max??'—'}, melhor resultado ${best.hist[k]}`).join(' | '):'Não foi possível avaliar a distribuição.';
-    yield {distributionError:`A busca não localizou um conjunto de ${wanted.toLocaleString('pt-BR')} cartelas que cumpra exatamente todos os valores Mono–Quina. Melhor aproximação encontrada: ${detail}. Isso não prova que seja impossível; tente alterar os valores ou a quantidade de cartelas.`};return;
+
+  if(!chosenBest&&targetStep>1&&!bestPartial){
+    // A última tentativa de tamanho mínimo evita pular soluções pequenas.
+    const minimumSize=1;
+    const slots=minimumSize*cfg.pick;
+    const minDegree=keys.reduce((sum,k,i)=>sum+(ranges[k]?.min??0)*(i+1),0);
+    if(minDegree<=slots&&minHist<=available.length){
+      const freqTargets=keys.map(k=>ranges[k]||{min:null,max:null});
+      if(freqTargets.every((r,i)=>r.min===null||r.min<=1)){
+        // O conjunto unitário só é viável quando suas frequências reais passam nos limites.
+        for(let idx=0;idx<candidates.length;idx++){const hist=getHist([idx]);if(isValidHist(hist)){chosenBest=[idx];bestHist=hist;break;}}
+      }
+    }
   }
-  if(cfg.mode==='sequential')best.indices.sort((a,b)=>a-b);
+  if(!chosenBest&&bestPartial){chosenBest=bestPartial;bestHist=bestPartialHist;}
+  if(!chosenBest){
+    const detail=constrained.map(k=>`${k}: pedido ${ranges[k].min??'—'} a ${ranges[k].max??'—'}`).join(' | ');
+    yield {distributionError:`A busca aplicou primeiro os filtros individuais e depois tentou montar a frequência global, mas não encontrou um conjunto que respeite Mono–Quina. ${detail}. Não foram entregues cartelas porque isso violaria os filtros globais. Tente ajustar os intervalos Mono–Quina ou os filtros individuais.`};return;
+  }
+  if(cfg.mode==='sequential')chosenBest.sort((a,b)=>a-b);
+  if(requested>0&&chosenBest.length<requested){
+    partialReason=`Foram encontradas ${chosenBest.length.toLocaleString('pt-BR')} cartelas válidas de ${requested.toLocaleString('pt-BR')} solicitadas. Todas passaram pelos filtros individuais e o conjunto final respeita os intervalos Mono–Quina.`;
+  }
   const labels={mono:'Mono',duque:'Duque',terno:'Terno',quadra:'Quadra',quina:'Quina'};
-  self.postMessage({type:'frequencySummary',text:keys.map(k=>{const r=targets[k];const rule=r&&(r.min!==null||r.max!==null)?` (pedido ${r.min??'—'} a ${r.max??'—'})`:'';return `${labels[k]}: ${best.hist[k]}${rule}`;}).join(' • ')});
-  for(const idx of best.indices)yield candidates[idx];
+  self.postMessage({type:'frequencySummary',text:keys.map(k=>{const r=ranges[k];const rule=r&&(r.min!==null||r.max!==null)?` (pedido ${r.min??'—'} a ${r.max??'—'})`:'';return `${labels[k]}: ${bestHist[k]}${rule}`;}).join(' • ')});
+  for(const idx of chosenBest)yield candidates[idx];
 }
 function* searchSequential(){
   const {min,max,pick,filters:f}=cfg, nums=[];
@@ -189,4 +309,4 @@ function largestSum(a,s,k){let x=0;for(let i=0;i<k;i++)x+=a[a.length-1-i]||0;ret
 function sieve(max){const a=new Uint8Array(max+1);if(max>=2)a.fill(1,2);for(let p=2;p*p<=max;p++)if(a[p])for(let m=p*p;m<=max;m+=p)a[m]=0;return a;}
 function fibonacci(max){const a=new Uint8Array(max+1);let x=0,y=1;while(x<=max){a[x]=1;[x,y]=[y,x+y];}return a;}
 function flush(){if(!pending.length)return;const results=pending;pending=[];self.postMessage({type:'batch',results,processed,found});}
-function finish(type){flush();self.postMessage({type,processed,found});}
+function finish(type){flush();if(type==='done'&&cfg.targetCount>0&&found<cfg.targetCount){type='partial';if(!partialReason)partialReason=`Foram encontradas ${found.toLocaleString('pt-BR')} cartelas válidas de ${cfg.targetCount.toLocaleString('pt-BR')} solicitadas. O programa entregou todas as cartelas válidas que conseguiu gerar.`;}self.postMessage({type,processed,found,requested:cfg.targetCount,reason:partialReason});}
